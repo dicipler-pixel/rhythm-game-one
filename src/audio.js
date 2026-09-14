@@ -59,6 +59,7 @@ export class Conductor {
     // Browsers keep the audio context suspended until a user gesture.
     if (this.ctx.state === 'suspended') await this.ctx.resume();
 
+    clearInterval(this.timer);                     // never leave two schedulers running
     this.events = events;
     this.nextEvent = 0;
     this.startedAt = this.ctx.currentTime + 0.2;   // small run-up

@@ -17,6 +17,9 @@ python3 -m http.server 8000
 
 Any static server works — `npx serve`, VS Code's Live Server, whatever you have.
 
+For a link you can send to people: Settings → Pages → deploy from the `main`
+branch. GitHub then serves the folder as-is — there's nothing to build.
+
 ## How it works
 
 Three files, each one idea.

@@ -50,6 +50,8 @@ let notes = [];
 let stats = null;
 let popups = [];              // floating PERFECT / GREAT / ... text
 let errors = [];              // recent hit errors in ms, for the timing bar
+let errorSum = 0;             // every hit's error, for the results average
+let errorCount = 0;
 const laneFlash = new Array(LANE_COUNT).fill(0);
 const laneHeld = new Array(LANE_COUNT).fill(false);
 
@@ -109,7 +111,8 @@ function showMenu() {
     <button id="play">Play</button>
     <p class="hint">
       Two bars of count-in first — listen, then play.<br>
-      <b>[</b> <b>]</b> nudge your timing offset · <b>Esc</b> quits a run
+      <b>[</b> <b>]</b> nudge your timing offset
+      (now <b>${offsetMs > 0 ? '+' : ''}${offsetMs} ms</b>) · <b>Esc</b> quits a run
     </p>`;
   document.getElementById('play').onclick = startGame;
 }
@@ -124,7 +127,7 @@ function showResults() {
   const rows = [...WINDOWS, MISS]
     .map(w => `<tr><td style="color:${w.color}">${w.name}</td><td>${stats.counts[w.name] || 0}</td></tr>`)
     .join('');
-  const mean = errors.length ? errors.reduce((a, b) => a + b, 0) / errors.length : 0;
+  const mean = errorCount ? errorSum / errorCount : 0;
   const drifting = Math.abs(mean) > 20;
 
   overlayBody.innerHTML = `
@@ -149,6 +152,8 @@ function startGame() {
   stats = { score: 0, combo: 0, maxCombo: 0, judged: 0, weight: 0, counts: {} };
   popups = [];
   errors = [];
+  errorSum = 0;
+  errorCount = 0;
   overlay.hidden = true;
   hud.hidden = false;
   state = 'playing';
@@ -161,7 +166,11 @@ window.addEventListener('keydown', e => {
   if (e.code === 'Escape' && state === 'playing') { conductor.stop(); showMenu(); return; }
   if (e.code === 'BracketLeft')  { setOffset(offsetMs - 5); return; }
   if (e.code === 'BracketRight') { setOffset(offsetMs + 5); return; }
-  if (state === 'menu' && (e.code === 'Space' || e.code === 'Enter')) { startGame(); return; }
+  if (state === 'menu' && (e.code === 'Space' || e.code === 'Enter')) {
+    // A focused button already starts the game on Enter/Space via its click.
+    if (!(e.target instanceof HTMLButtonElement)) startGame();
+    return;
+  }
   if (state !== 'playing' || e.repeat) return;
 
   const lane = KEYS.indexOf(e.code);
@@ -180,6 +189,7 @@ window.addEventListener('keyup', e => {
 function setOffset(ms) {
   offsetMs = Math.max(-200, Math.min(200, ms));
   try { localStorage.setItem('rg.offset', String(offsetMs)); } catch { /* not fatal */ }
+  if (state === 'menu') showMenu();   // the menu is the only place it's otherwise invisible
 }
 
 // The moment the player believes it is, in song seconds.
@@ -222,6 +232,8 @@ function applyJudgment(note, verdict, errMs) {
     stats.score += Math.round(verdict.score * (1 + Math.min(stats.combo, 100) / 100));
     errors.push(errMs);
     if (errors.length > 50) errors.shift();
+    errorSum += errMs;
+    errorCount++;
   }
 
   popups.push({ text: verdict.name, color: verdict.color, lane: note.lane, born: performance.now() });
@@ -355,13 +367,15 @@ function drawTimingBar(w, h) {
   ctx2d.fillText('LATE', x + barW, y - 8);
 }
 
+let lastHud = '';
 function drawHud() {
   const acc = stats.judged ? (stats.weight / stats.judged) * 100 : 100;
-  hud.innerHTML = `
+  const html = `
     <div class="score">${stats.score.toLocaleString()}</div>
     <div class="acc">${acc.toFixed(2)}%</div>
     <div class="combo ${stats.combo > 1 ? 'on' : ''}">${stats.combo > 1 ? stats.combo + '×' : ''}</div>
     <div class="offset">OFFSET ${offsetMs > 0 ? '+' : ''}${offsetMs} ms</div>`;
+  if (html !== lastHud) { hud.innerHTML = html; lastHud = html; }
 }
 
 function hexToRgba(hex, a) {
