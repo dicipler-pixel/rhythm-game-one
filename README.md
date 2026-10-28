@@ -1,4 +1,4 @@
-# rhythm-game
+# rhythm-game-one
 
 A 4-key rhythm game that runs in the browser. Plain HTML, Canvas and Web Audio —
 no framework, no build step, no dependencies, no audio files.
